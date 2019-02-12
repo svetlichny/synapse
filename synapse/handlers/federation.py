@@ -45,6 +45,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.crypto.event_signing import compute_event_signature
+from synapse.event_auth import auth_types_for_event
 from synapse.events.validator import EventValidator
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
@@ -1554,6 +1555,7 @@ class FederationHandler(BaseHandler):
             origin, event,
             state=state,
             auth_events=auth_events,
+            backfilled=backfilled,
         )
 
         # reraise does not allow inlineCallbacks to preserve the stacktrace, so we
@@ -1598,6 +1600,7 @@ class FederationHandler(BaseHandler):
                     event,
                     state=ev_info.get("state"),
                     auth_events=ev_info.get("auth_events"),
+                    backfilled=backfilled,
                 )
             defer.returnValue(res)
 
@@ -1720,7 +1723,7 @@ class FederationHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def _prep_event(self, origin, event, state=None, auth_events=None):
+    def _prep_event(self, origin, event, state, auth_events, backfilled):
         """
 
         Args:
@@ -1728,6 +1731,7 @@ class FederationHandler(BaseHandler):
             event:
             state:
             auth_events:
+            backfilled (bool)
 
         Returns:
             Deferred, which resolves to synapse.events.snapshot.EventContext
@@ -1768,6 +1772,65 @@ class FederationHandler(BaseHandler):
             )
 
             context.rejected = RejectedReason.AUTH_ERROR
+
+        # For new (non-backfilled and non-outlier) events we check if the event
+        # passes auth based on the current state. If it doesn't then we
+        # "soft-fail" the event.
+        if not backfilled and not event.internal_metadata.is_outlier():
+            extrem_ids = yield self.store.get_latest_event_ids_in_room(
+                event.room_id,
+            )
+
+            extrem_ids = set(extrem_ids)
+            prev_event_ids = set(event.prev_event_ids())
+
+            if extrem_ids == prev_event_ids:
+                # TODO: If they're the same then there isn't any point doing the
+                # do.
+                pass
+
+            room_version = yield self.store.get_room_version(event.room_id)
+
+            # Calcuate the "current state"
+            if state is not None:
+                state_sets = yield self.store.get_state_groups(
+                    event.room_id, extrem_ids,
+                )
+                state_sets = list(state_sets.values())
+                state_sets.append(state)
+                current_state_ids = yield self.state_handler.resolve_events(
+                    room_version, state_sets, event,
+                )
+                current_state_ids = {
+                    k: e.event_id for k, e in iteritems(current_state_ids)
+                }
+            else:
+                extrem_ids.update(prev_event_ids)
+
+                current_state_ids = yield self.state_handler.get_current_state_ids(
+                    event.room_id, latest_event_ids=extrem_ids,
+                )
+
+            # Now check if event pass auth against said current state
+            auth_types = auth_types_for_event(event)
+            current_state_ids = [
+                e for k, e in iteritems(current_state_ids)
+                if k in auth_types
+            ]
+
+            current_auth_events = yield self.store.get_events(current_state_ids)
+            current_auth_events = {
+                (e.type, e.state_key): e for e in auth_events.values()
+            }
+
+            try:
+                self.auth.check(room_version, event, auth_events=current_auth_events)
+            except AuthError as e:
+                logger.warn(
+                    "Failed current state auth resolution for %r because %s",
+                    event, e,
+                )
+                event.internal_metadata.relay_to_client = False
 
         if event.type == EventTypes.GuestAccess and not context.rejected:
             yield self.maybe_kick_guest_users(event)
