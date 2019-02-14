@@ -466,7 +466,7 @@ class ShutdownRoomRestServlet(ClientV1RestServlet):
         )
         new_room_id = info["room_id"]
 
-        yield self.event_creation_handler.create_and_send_nonmember_event(
+        yield self.event_creation_handler.create_and_send_event(
             room_creator_requester,
             {
                 "type": "m.room.message",

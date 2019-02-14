@@ -172,7 +172,7 @@ class RoomStateEventRestServlet(ClientV1RestServlet):
                 content=content,
             )
         else:
-            event = yield self.event_creation_handler.create_and_send_nonmember_event(
+            event = yield self.event_creation_handler.create_and_send_event(
                 requester,
                 event_dict,
                 txn_id=txn_id,
@@ -211,7 +211,7 @@ class RoomSendEventRestServlet(ClientV1RestServlet):
         if b'ts' in request.args and requester.app_service:
             event_dict['origin_server_ts'] = parse_integer(request, "ts", 0)
 
-        event = yield self.event_creation_handler.create_and_send_nonmember_event(
+        event = yield self.event_creation_handler.create_and_send_event(
             requester,
             event_dict,
             txn_id=txn_id,
@@ -724,7 +724,7 @@ class RoomRedactEventRestServlet(ClientV1RestServlet):
         requester = yield self.auth.get_user_by_req(request)
         content = parse_json_object_from_request(request)
 
-        event = yield self.event_creation_handler.create_and_send_nonmember_event(
+        event = yield self.event_creation_handler.create_and_send_event(
             requester,
             {
                 "type": EventTypes.Redaction,

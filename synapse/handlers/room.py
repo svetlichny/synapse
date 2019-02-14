@@ -137,7 +137,7 @@ class RoomCreationHandler(BaseHandler):
             )
 
             # now send the tombstone
-            yield self.event_creation_handler.send_nonmember_event(
+            yield self.event_creation_handler.send_event(
                 requester, tombstone_event, tombstone_context,
             )
 
@@ -209,7 +209,7 @@ class RoomCreationHandler(BaseHandler):
 
         if updated:
             try:
-                yield self.event_creation_handler.create_and_send_nonmember_event(
+                yield self.event_creation_handler.create_and_send_event(
                     requester, {
                         "type": EventTypes.PowerLevels,
                         "state_key": '',
@@ -222,7 +222,7 @@ class RoomCreationHandler(BaseHandler):
                 logger.warning("Unable to update PLs in old room: %s", e)
 
         logger.info("Setting correct PLs in new room")
-        yield self.event_creation_handler.create_and_send_nonmember_event(
+        yield self.event_creation_handler.create_and_send_event(
             requester, {
                 "type": EventTypes.PowerLevels,
                 "state_key": '',
@@ -296,6 +296,7 @@ class RoomCreationHandler(BaseHandler):
         for k, old_event_id in iteritems(old_room_state_ids):
             old_event = old_room_state_events.get(old_event_id)
             if old_event:
+
                 initial_state[k] = old_event.content
 
         yield self._send_events_for_new_room(
@@ -397,7 +398,7 @@ class RoomCreationHandler(BaseHandler):
 
         try:
             if canonical_alias and (canonical_alias in removed_aliases):
-                yield self.event_creation_handler.create_and_send_nonmember_event(
+                yield self.event_creation_handler.create_and_send_event(
                     requester,
                     {
                         "type": EventTypes.CanonicalAlias,
@@ -554,7 +555,7 @@ class RoomCreationHandler(BaseHandler):
 
         if "name" in config:
             name = config["name"]
-            yield self.event_creation_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_event(
                 requester,
                 {
                     "type": EventTypes.Name,
@@ -567,7 +568,7 @@ class RoomCreationHandler(BaseHandler):
 
         if "topic" in config:
             topic = config["topic"]
-            yield self.event_creation_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_event(
                 requester,
                 {
                     "type": EventTypes.Topic,
@@ -645,10 +646,10 @@ class RoomCreationHandler(BaseHandler):
         def send(etype, content, **kwargs):
             event = create(etype, content, **kwargs)
             logger.info("Sending %s in new room", etype)
-            yield self.event_creation_handler.create_and_send_nonmember_event(
+            yield self.event_creation_handler.create_and_send_event(
                 creator,
                 event,
-                ratelimit=False
+                ratelimit=False,
             )
 
         config = RoomCreationHandler.PRESETS_DICT[preset_config]

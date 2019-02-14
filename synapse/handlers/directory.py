@@ -312,7 +312,7 @@ class DirectoryHandler(BaseHandler):
     def send_room_alias_update_event(self, requester, room_id):
         aliases = yield self.store.get_aliases_for_room(room_id)
 
-        yield self.event_creation_handler.create_and_send_nonmember_event(
+        yield self.event_creation_handler.create_and_send_event(
             requester,
             {
                 "type": EventTypes.Aliases,
@@ -334,7 +334,7 @@ class DirectoryHandler(BaseHandler):
         if not alias_event or alias_event.content.get("alias", "") != alias_str:
             return
 
-        yield self.event_creation_handler.create_and_send_nonmember_event(
+        yield self.event_creation_handler.create_and_send_event(
             requester,
             {
                 "type": EventTypes.CanonicalAlias,

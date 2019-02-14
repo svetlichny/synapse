@@ -414,7 +414,7 @@ class EventCreationHandler(object):
         )
 
     @defer.inlineCallbacks
-    def send_nonmember_event(self, requester, event, context, ratelimit=True):
+    def send_event(self, requester, event, context, ratelimit=True):
         """
         Persists and notifies local clients and federation of an event.
 
@@ -424,12 +424,6 @@ class EventCreationHandler(object):
             ratelimit (bool): Whether to rate limit this send.
             is_guest (bool): Whether the sender is a guest.
         """
-        if event.type == EventTypes.Member:
-            raise SynapseError(
-                500,
-                "Tried to send member event through non-member codepath"
-            )
-
         user = UserID.from_string(event.sender)
 
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
@@ -471,17 +465,17 @@ class EventCreationHandler(object):
         return
 
     @defer.inlineCallbacks
-    def create_and_send_nonmember_event(
+    def create_and_send_event(
         self,
         requester,
         event_dict,
         ratelimit=True,
-        txn_id=None
+        txn_id=None,
     ):
         """
         Creates an event, then sends it.
 
-        See self.create_event and self.send_nonmember_event.
+        See self.create_event and self.send_(non)member_event.
         """
 
         # We limit the number of concurrent event sends in a room so that we
@@ -505,12 +499,13 @@ class EventCreationHandler(object):
                     403, spam_error, Codes.FORBIDDEN
                 )
 
-            yield self.send_nonmember_event(
+            yield self.send_event(
                 requester,
                 event,
                 context,
                 ratelimit=ratelimit,
             )
+
         defer.returnValue(event)
 
     @measure_func("create_new_client_event")

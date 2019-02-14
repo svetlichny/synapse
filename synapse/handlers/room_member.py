@@ -364,6 +364,7 @@ class RoomMemberHandler(object):
 
         if effective_membership_state == Membership.INVITE:
             # block any attempts to invite the server notices mxid
+
             if target.to_string() == self._server_notices_mxid:
                 raise SynapseError(
                     http_client.FORBIDDEN,
@@ -818,7 +819,7 @@ class RoomMemberHandler(object):
             )
         )
 
-        yield self.event_creation_handler.create_and_send_nonmember_event(
+        yield self.event_creation_handler.create_and_send_event(
             requester,
             {
                 "type": EventTypes.ThirdPartyInvite,
